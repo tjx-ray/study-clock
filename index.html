@@ -110,4 +110,56 @@
                 oscillator.type = 'sine';
                 oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
                 gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + 1);
+            }
+            // 2. 调用安卓/鸿蒙硬件震动 (震动1秒，停0.5秒，震动1秒)
+            if (navigator.vibrate) {
+                navigator.vibrate([1000, 500, 1000]);
+            }
+        }
+
+        function checkTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const currentTimeStr = `${hours}:${minutes}`;
+            const currentTimestamp = Date.now();
+
+            timeDisplay.innerText = `${hours}:${minutes}:${seconds}`;
+
+            let nextTime = "";
+            for (let i = 0; i < SCHEDULE.length; i++) {
+                if (currentTimeStr < SCHEDULE[i].time) { nextTime = SCHEDULE[i].time; break; }
+            }
+            nextEventDisplay.innerText = nextTime ? `下一个时间节点: ${nextTime}` : "今日复习节点已全部完成";
+
+            for (let i = 0; i < SCHEDULE.length; i++) {
+                if (currentTimeStr === SCHEDULE[i].time && lastAlertedTime !== currentTimeStr) {
+                    lastAlertedTime = currentTimeStr;
+                    alertEndTime = currentTimestamp + 120000;
+                    currentAlertMsg = SCHEDULE[i].msg;
+                    playBeep(); // 触发声音和震动
+                }
+            }
+
+            if (currentTimestamp < alertEndTime) {
+                body.classList.add("alert-bg");
+                dynamicText.className = "alert-text";
+                dynamicText.innerText = currentAlertMsg;
+            } else {
+                body.classList.remove("alert-bg");
+                dynamicText.className = "quote-text";
+                if (currentTimestamp - lastQuoteChange > 15000) {
+                    currentQuoteIdx = (currentQuoteIdx + 1) % QUOTES.length;
+                    lastQuoteChange = currentTimestamp;
+                }
+                dynamicText.innerText = QUOTES[currentQuoteIdx];
+            }
+        }
+    </script>
+</body>
+</html>
