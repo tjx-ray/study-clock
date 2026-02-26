@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沉浸式作息表</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            color: white;
+            font-family: 'Microsoft YaHei', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            transition: background-color 0.5s ease; /* 背景变色动画 */
+            overflow: hidden;
+        }
+
+        /* 初始的点击全屏遮罩（解决浏览器静音限制） */
+        #start-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            cursor: pointer;
+        }
+        #start-btn {
+            font-size: 24px;
+            color: white;
+            border: 2px solid white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        /* 主界面元素 */
+        #title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        #time-display {
+            font-size: 5rem;
+            font-weight: bold;
+            color: #00BFFF; /* 天蓝色 */
+            margin-bottom: 10px;
+            font-family: 'Arial', sans-serif;
+        }
+        #next-event {
+            font-size: 1.2rem;
+            color: gray;
+            margin-bottom: 40px;
+        }
+        #dynamic-text {
+            font-size: 1.3rem;
+            text-align: center;
+            max-width: 90%;
+            min-height: 60px;
+            line-height: 1.5;
+            padding: 0 20px;
+        }
+
+        /* 警报模式下的样式类 */
+        .alert-bg {
+            background-color: #330000 !important; /* 暗红色背景 */
+        }
+        .quote-text {
+            color: #FFD700; /* 鼓励语：亮黄色 */
+        }
+        .alert-text {
+            color: #FF4500; /* 警报语：醒目橙红 */
+            font-size: 1.6rem !important;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay" onclick="startApp()">
+        <button id="start-btn">点击开启沉浸式复习</button>
+    </div>
+
+    <div id="title">沉浸ing...</div>
+    <div id="time-display">00:00:00</div>
+    <div id="next-event">加载中...</div>
+    <div id="dynamic-text" class="quote-text">星光不问赶路人，时光不负有心人。</div>
+
+    <script>
+        // --- 核心数据配置 ---
+        const SCHEDULE = [
+            { time: "08:00", msg: "【上课啦】第一节课开始，集中注意力！" },
+            { time: "08:40", msg: "【下课啦】第一节结束，休息5分钟" },
+            { time: "08:45", msg: "【上课啦】第二节课开始，继续加油！" },
+            { time: "09:25", msg: "【下课啦】第二节结束，休息5分钟" },
+            { time: "09:30", msg: "【上课啦】第三节课开始，稳住！" },
+            { time: "10:10", msg: "【大课间】第三节结束，休息25分钟！去喝水走走！" },
+            { time: "10:35", msg: "【上课啦】第四节课开始，大课间结束啦！" },
+            { time: "11:15", msg: "【下课啦】第四节结束，休息5分钟" },
+            { time: "11:20", msg: "【上课啦】第五节课开始，上午最后一节！" },
+            { time: "12:00", msg: "【干饭啦】上午课程结束，吃午饭+午休！" },
+            { time: "14:00", msg: "【上课啦】第六节课开始，下午好！" },
+            { time: "14:40", msg: "【下课啦】第六节结束，休息10分钟" },
+            { time: "14:50", msg: "【上课啦】第七节课开始，保持清醒！" },
+            { time: "15:30", msg: "【下课啦】第七节结束，休息10分钟" },
+            { time: "15:40", msg: "【上课啦】第八节课开始，一鼓作气！" },
+            { time: "16:20", msg: "【下课啦】第八节结束，休息10分钟" },
+            { time: "16:30", msg: "【上课啦】第九节课开始，下午最后一节！" },
+            { time: "17:10", msg: "【干饭啦】下午课程结束，吃晚饭+休整！" },
+            { time: "18:30", msg: "【晚自习】晚一打铃，静下心来！" },
+            { time: "19:30", msg: "【下课啦】晚一结束，休息10分钟" },
+            { time: "19:40", msg: "【晚自习】晚二打铃，突破难点！" },
+            { time: "20:40", msg: "【下课啦】晚二结束，休息10分钟" },
+            { time: "20:50", msg: "【晚自习】晚三打铃，最后冲刺！" },
+            { time: "21:50", msg: "【放学啦】全天复习结束，早点休息，明天继续！" }
+        ];
+
+        const QUOTES = [
+            "星光不问赶路人，时光不负有心人。",
+            "乾坤未定，你我皆是黑马。",
+            "再多学一点，就离梦想更近一步。",
+            "代码多敲一遍，电路图多画一次，专业课就能多拿一分！",
+            "那些看似不起波澜的日复一日，会突然在某天让人看到坚持的意义。",
+            "生医工的巅峰在向你招手，坚持住！",
+            "现在的坚持，是为了将来的毫不费力。",
+            "政治英语不用怕，数一数电稳扎稳打。",
+            "疑行无成，疑事无功"
+        ];
+
+        // --- 状态变量 ---
+        let lastAlertedTime = "";
+        let alertEndTime = 0; // 毫秒时间戳
+        let currentAlertMsg = "";
+        let currentQuoteIdx = 0;
+        let lastQuoteChange = Date.now();
+        
+        // 音频上下文
+        let audioCtx = null;
+
+        // 获取DOM元素
+        const timeDisplay = document.getElementById("time-display");
+        const nextEventDisplay = document.getElementById("next-event");
+        const dynamicText = document.getElementById("dynamic-text");
+        const body = document.body;
+
+        // 1. 初始化并隐藏遮罩层 (解决浏览器必须交互才能发声的限制)
+        function startApp() {
+            document.getElementById("start-overlay").style.display = "none";
+            // 初始化音频接口
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // 立即运行一次时钟
+            checkTime();
+            // 每 0.5 秒循环一次
+            setInterval(checkTime, 500);
+        }
+
+        // 2. 发出 1000Hz 的蜂鸣声，持续 1 秒
+        function playBeep() {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); // 1000Hz 频率
+            
+            // 音量控制，避免爆音
+            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 1);
+        }
+
+        // 3. 核心时钟逻辑
+        function checkTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const currentTimeStr = `${hours}:${minutes}`;
+            const currentTimestamp = Date.now();
+
+            // 更新大屏时间
+            timeDisplay.innerText = `${hours}:${minutes}:${seconds}`;
+
+            // 寻找下一个节点
+            let nextTime = "";
+            for (let i = 0; i < SCHEDULE.length; i++) {
+                if (currentTimeStr < SCHEDULE[i].time) {
+                    nextTime = SCHEDULE[i].time;
+                    break;
+                }
+            }
+            nextEventDisplay.innerText = nextTime ? `下一个时间节点: ${nextTime}` : "今日复习节点已全部完成";
+
+            // 检查是否到达打铃时间
+            for (let i = 0; i < SCHEDULE.length; i++) {
+                if (currentTimeStr === SCHEDULE[i].time && lastAlertedTime !== currentTimeStr) {
+                    lastAlertedTime = currentTimeStr;
+                    // 设置警报结束时间为当前时间 + 2分钟 (120000 毫秒)
+                    alertEndTime = currentTimestamp + 120000;
+                    currentAlertMsg = SCHEDULE[i].msg;
+                    
+                    // 发出声响
+                    playBeep();
+                }
+            }
+
+            // 控制屏幕状态：警报模式 vs 平时模式
+            if (currentTimestamp < alertEndTime) {
+                // 警报模式 (维持2分钟)
+                body.classList.add("alert-bg");
+                dynamicText.className = "alert-text";
+                dynamicText.innerText = currentAlertMsg;
+            } else {
+                // 平时模式
+                body.classList.remove("alert-bg");
+                dynamicText.className = "quote-text";
+                
+                // 每 15 秒切换一句鼓励语
+                if (currentTimestamp - lastQuoteChange > 15000) {
+                    currentQuoteIdx = (currentQuoteIdx + 1) % QUOTES.length;
+                    lastQuoteChange = currentTimestamp;
+                }
+                dynamicText.innerText = QUOTES[currentQuoteIdx];
+            }
+        }
+    </script>
+</body>
+</html>
